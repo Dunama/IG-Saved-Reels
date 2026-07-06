@@ -1,0 +1,17 @@
+# Credentials — never commit
+.env
+
+# Legacy config (replaced by .env; listed defensively)
+config.js
+config.example.js
+generate-config.js
+
+# Packaged builds (may contain .env)
+*.zip
+*.crx
+*.pem
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini

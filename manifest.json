@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Saved Reels",
+  "version": "0.1.0",
+  "description": "Sync your saved Instagram reels and browse them anytime from a side panel.",
+  "icons": {
+    "16": "savedReelsLogo.png",
+    "48": "savedReelsLogo.png",
+    "128": "savedReelsLogo.png"
+  },
+  "permissions": ["sidePanel", "storage"],
+  "host_permissions": [
+    "*://*.instagram.com/*",
+    "https://*.supabase.co/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Open Saved Reels",
+    "default_icon": "savedReelsLogo.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.instagram.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

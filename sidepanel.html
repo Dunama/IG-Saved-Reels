@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Saved Reels</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@600;700&family=Space+Mono:wght@400;700&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="sidepanel.css" />
+</head>
+<body>
+  <header class="panel-header">
+    <div class="brand">
+      <img src="savedReelsLogo.png" alt="" class="brand-logo" />
+      <h1 class="wordmark">Saved Reels</h1>
+    </div>
+    <div class="header-actions">
+      <button id="refresh-btn" class="icon-btn" title="Refresh" aria-label="Refresh reels" hidden>⟳</button>
+      <button id="signout-btn" class="icon-btn" title="Sign out" aria-label="Sign out" hidden>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Auth (shown when signed out) -->
+  <section id="auth" class="auth" hidden>
+    <p id="auth-hint" class="auth-hint">Sign in to Saved Reels to see your synced reels.</p>
+    <form id="auth-form">
+      <input id="auth-email" type="email" placeholder="Email" aria-label="Email" required autocomplete="username" />
+      <input id="auth-password" type="password" placeholder="Password" aria-label="Password" required autocomplete="current-password" minlength="6" />
+      <button id="auth-submit" type="submit">Sign in</button>
+      <p id="auth-error" class="auth-error" role="alert" hidden></p>
+      <p id="auth-msg" class="auth-info" role="status" hidden></p>
+    </form>
+    <button id="auth-toggle" type="button" class="link-btn auth-toggle">
+      New here? Create an account
+    </button>
+  </section>
+
+  <!-- Toolbar: search + sort -->
+  <section id="toolbar" class="toolbar" hidden>
+    <input id="search-input" type="search" placeholder="Search captions…" aria-label="Search captions" />
+    <button id="sort-btn" class="sort-btn" title="Toggle sort order" aria-label="Toggle sort order">Newest ↓</button>
+  </section>
+
+  <!-- Feed -->
+  <main id="feed" class="feed" hidden></main>
+
+  <!-- Status strip: loading / error / empty -->
+  <div id="status" class="status" aria-live="polite" hidden></div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>
