@@ -121,12 +121,13 @@ $("sort-btn").addEventListener("click", () => {
 
 function render() {
   const feed = $("feed");
-  activeEmbed = null; // feed is rebuilt; stale player refs would leak
+  if (modalIndex >= 0) closeModal(); // feed is rebuilt; stale indices would misplay
   feed.replaceChildren();
 
   const visible = query
     ? allReels.filter((r) => (r.caption || "").toLowerCase().includes(query))
     : allReels;
+  currentList = visible;
 
   if (!visible.length) {
     setStatus(
@@ -138,16 +139,14 @@ function render() {
   }
   setStatus(null);
 
-  for (const reel of visible) {
-    feed.appendChild(buildCard(reel));
-  }
+  visible.forEach((reel, i) => feed.appendChild(buildCard(reel, i)));
 }
 
-function buildCard(reel) {
+function buildCard(reel, index) {
   const card = document.createElement("article");
   card.className = "card";
 
-  // Media area: thumbnail is a play button that swaps in an inline embed.
+  // Media area: thumbnail is a play button that opens the modal player.
   const media = document.createElement("div");
   media.className = "card-media";
 
@@ -169,7 +168,7 @@ function buildCard(reel) {
     img.replaceWith(makeThumbFallback());
   });
   play.appendChild(img);
-  play.addEventListener("click", () => playInline(media, reel));
+  play.addEventListener("click", () => openModal(index));
   media.appendChild(play);
   card.appendChild(media);
 
@@ -219,27 +218,71 @@ function embedUrl(reelUrl) {
   }
 }
 
-// Only one embed at a time — otherwise multiple reels play audio at once.
-let activeEmbed = null; // { wrap, thumb }
+//  Modal player (Phase 4.5)
+// Click card -> modal + spinner -> ask background for a fresh video URL
+// (JIT hidden-tab scrape) -> <video> with custom controls. If that fails,
+// fall back to the Instagram embed iframe. Error state only if both fail.
 
-function closeActiveEmbed() {
-  if (!activeEmbed) return;
-  activeEmbed.wrap.replaceWith(activeEmbed.thumb);
-  activeEmbed = null;
+let currentList = []; // reels currently rendered (post-search/sort)
+let modalIndex = -1;  // index into currentList, -1 = closed
+
+function openModal(index) {
+  modalIndex = index;
+  $("modal").hidden = false;
+  loadModalContent();
 }
 
-function playInline(media, reel) {
-  const src = embedUrl(reel.reel_url);
-  if (!src) {
-    // Can't build an embed URL — fall back to a new tab.
-    window.open(reel.reel_url, "_blank", "noopener");
+function closeModal() {
+  modalIndex = -1;
+  $("modal").hidden = true;
+  $("modal-stage").replaceChildren(); // stops video/iframe playback
+  $("modal-caption").textContent = "";
+}
+
+function stepModal(delta) {
+  if (modalIndex < 0 || !currentList.length) return;
+  modalIndex = (modalIndex + delta + currentList.length) % currentList.length;
+  loadModalContent();
+}
+
+async function loadModalContent() {
+  const reel = currentList[modalIndex];
+  if (!reel) return closeModal();
+
+  const stage = $("modal-stage");
+  stage.replaceChildren(makeSpinner()); // spinner immediately — JIT takes a moment
+  $("modal-caption").textContent = reel.caption || "";
+  setPlayGlyph(true);
+
+  const requested = modalIndex;
+  const res = await send({ type: "GET_VIDEO_URL", reel_url: reel.reel_url });
+  // User navigated or closed while we were fetching — drop stale result.
+  if (requested !== modalIndex || $("modal").hidden) return;
+
+  if (res?.ok && res.video_url) {
+    const video = document.createElement("video");
+    video.className = "modal-video";
+    video.src = res.video_url;
+    video.autoplay = true;
+    video.loop = true;
+    video.playsInline = true;
+    video.addEventListener("click", toggle_play);
+    video.addEventListener("play", () => setPlayGlyph(true));
+    video.addEventListener("pause", () => setPlayGlyph(false));
+    // Signed URL can still be rejected on playback — fall back then too.
+    video.addEventListener("error", () => {
+      if (stage.contains(video)) showEmbedFallback(stage, reel);
+    });
+    stage.replaceChildren(video);
     return;
   }
 
-  closeActiveEmbed();
+  showEmbedFallback(stage, reel);
+}
 
-  const wrap = document.createElement("div");
-  wrap.className = "embed-wrap";
+function showEmbedFallback(stage, reel) {
+  const src = embedUrl(reel.reel_url);
+  if (!src) return stage.replaceChildren(makeModalError());
 
   const iframe = document.createElement("iframe");
   iframe.className = "embed-frame";
@@ -248,23 +291,63 @@ function playInline(media, reel) {
   iframe.allow = "autoplay; encrypted-media; picture-in-picture";
   iframe.allowFullscreen = true;
 
-  const close = document.createElement("button");
-  close.type = "button";
-  close.className = "embed-close";
-  close.setAttribute("aria-label", "Close player");
-  close.textContent = "✕";
-
-  const thumb = media.firstElementChild;
-  close.addEventListener("click", () => {
-    closeActiveEmbed();
-    thumb.focus(); // return focus for keyboard users
+  // iframes don't fire error events for blocked/failed loads — use a timeout.
+  const timer = setTimeout(() => {
+    if (stage.contains(iframe) && !loaded) {
+      stage.replaceChildren(makeModalError());
+    }
+  }, 8000);
+  let loaded = false;
+  iframe.addEventListener("load", () => {
+    loaded = true;
+    clearTimeout(timer);
   });
 
-  wrap.append(iframe, close);
-  thumb.replaceWith(wrap);
-  activeEmbed = { wrap, thumb };
-  close.focus();
+  stage.replaceChildren(iframe);
 }
+
+function toggle_play() {
+  const video = $("modal-stage").querySelector("video");
+  if (!video) return;
+  video.paused ? video.play() : video.pause();
+}
+
+function setPlayGlyph(playing) {
+  $("modal-play").textContent = playing ? "❚❚" : "▶";
+}
+
+function makeSpinner() {
+  const div = document.createElement("div");
+  div.className = "spinner";
+  div.setAttribute("role", "status");
+  div.setAttribute("aria-label", "Loading reel");
+  return div;
+}
+
+function makeModalError() {
+  const div = document.createElement("div");
+  div.className = "modal-error";
+  div.textContent = "Couldn't load this reel — it may have been deleted.";
+  return div;
+}
+
+// Modal controls
+$("modal-close").addEventListener("click", closeModal);
+$("modal-backdrop").addEventListener("click", closeModal);
+$("modal-prev").addEventListener("click", () => stepModal(-1));
+$("modal-next").addEventListener("click", () => stepModal(1));
+$("modal-play").addEventListener("click", toggle_play);
+
+document.addEventListener("keydown", (e) => {
+  if (modalIndex < 0) return;
+  if (e.key === "Escape") closeModal();
+  else if (e.key === "ArrowLeft") stepModal(-1);
+  else if (e.key === "ArrowRight") stepModal(1);
+  else if (e.key === " ") {
+    e.preventDefault();
+    toggle_play();
+  }
+});
 
 function makeThumbFallback() {
   const div = document.createElement("div");

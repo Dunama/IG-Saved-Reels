@@ -58,6 +58,21 @@
   <!-- Status strip: loading / error / empty -->
   <div id="status" class="status" aria-live="polite" hidden></div>
 
+  <!-- Player modal (Phase 4.5) -->
+  <div id="modal" class="modal" hidden>
+    <div id="modal-backdrop" class="modal-backdrop"></div>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-label="Reel player">
+      <button id="modal-close" class="icon-btn modal-close" aria-label="Close player">✕</button>
+      <div id="modal-stage" class="modal-stage"></div>
+      <p id="modal-caption" class="modal-caption"></p>
+      <div class="modal-controls">
+        <button id="modal-prev" class="icon-btn" aria-label="Previous reel">‹</button>
+        <button id="modal-play" class="icon-btn modal-play" aria-label="Play or pause">❚❚</button>
+        <button id="modal-next" class="icon-btn" aria-label="Next reel">›</button>
+      </div>
+    </div>
+  </div>
+
   <script src="sidepanel.js"></script>
 </body>
 </html>

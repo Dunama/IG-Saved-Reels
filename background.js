@@ -236,7 +236,79 @@ async function fetchReels({ ascending = false } = {}) {
   return res.json();
 }
 
-//  Message hub 
+//  Just-in-time video URL fetch
+// Instagram's video URLs are signed and expire, so we can't store them.
+// On demand: open a background tab to the reel, wait for load, scrape the
+// current <video> src (or og:video meta), close the tab, return the URL.
+
+const JIT_TAB_LOAD_MS = 15_000; // max wait for the reel page to load
+const JIT_POLL_MS = 8_000;      // max wait for a usable video src after load
+
+async function fetchVideoUrl(reelUrl) {
+  const u = new URL(reelUrl);
+  if (!/(^|\.)instagram\.com$/.test(u.hostname)) {
+    throw new Error("Not an Instagram URL");
+  }
+
+  let tabId = null;
+  try {
+    const tab = await chrome.tabs.create({ url: reelUrl, active: false });
+    tabId = tab.id;
+    await waitForTabComplete(tabId, JIT_TAB_LOAD_MS);
+    return await pollForVideoSrc(tabId, JIT_POLL_MS);
+  } finally {
+    if (tabId !== null) chrome.tabs.remove(tabId).catch(() => {});
+  }
+}
+
+function waitForTabComplete(tabId, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("Reel page load timed out"));
+    }, timeoutMs);
+    const listener = (id, info) => {
+      if (id === tabId && info.status === "complete") {
+        cleanup();
+        resolve();
+      }
+    };
+    const cleanup = () => {
+      clearTimeout(timer);
+      chrome.tabs.onUpdated.removeListener(listener);
+    };
+    chrome.tabs.onUpdated.addListener(listener);
+  });
+}
+
+async function pollForVideoSrc(tabId, budgetMs) {
+  const deadline = Date.now() + budgetMs;
+  while (Date.now() < deadline) {
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const v = document.querySelector("video");
+        const src =
+          v?.currentSrc || v?.src || v?.querySelector("source")?.src || "";
+        if (src) return src;
+        const og = document.querySelector(
+          'meta[property="og:video"], meta[property="og:video:url"]'
+        );
+        return og?.content || null;
+      },
+    });
+    if (result && /^https?:/.test(result)) return result;
+    if (result && result.startsWith("blob:")) {
+      // MSE blob stream — only playable inside that page. Caller falls
+      // back to the embed player.
+      throw new Error("Video is blob-streamed; use embed fallback");
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error("No video source found in time");
+}
+
+//  Message hub
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const respond = (p) => sendResponse(p);
@@ -274,6 +346,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "GET_AUTH_STATE":
       getAuthState().then(respond);
+      return true;
+
+    case "GET_VIDEO_URL":
+      fetchVideoUrl(message.reel_url)
+        .then((videoUrl) => respond({ ok: true, video_url: videoUrl }))
+        .catch((err) => respond({ ok: false, error: String(err.message || err) }));
       return true;
 
     case "FETCH_REELS":

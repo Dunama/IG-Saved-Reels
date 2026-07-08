@@ -8,7 +8,7 @@
     "48": "savedReelsLogo.png",
     "128": "savedReelsLogo.png"
   },
-  "permissions": ["sidePanel", "storage"],
+  "permissions": ["sidePanel", "storage", "scripting"],
   "host_permissions": [
     "*://*.instagram.com/*",
     "https://*.supabase.co/*"
