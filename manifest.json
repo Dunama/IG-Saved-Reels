@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Saved Reels",
-  "version": "0.1.0",
+  "version": "0.5.0",
   "description": "Sync your saved Instagram reels and browse them anytime from a side panel.",
   "icons": {
     "16": "savedReelsLogo.png",

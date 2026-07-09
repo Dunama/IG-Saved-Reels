@@ -76,6 +76,10 @@ Design decisions worth knowing:
 - The Supabase **anon key** is designed to be client-side public — data is protected by RLS, not key secrecy. Never put your `service_role` key anywhere in this project.
 - Auth tokens are stored in `chrome.storage.local`, scoped to this extension.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for the full version history — from `"content script loaded"` to in-panel playback.
+
 ## License
 
 [MIT](LICENSE)
